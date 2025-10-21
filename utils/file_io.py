@@ -29,7 +29,6 @@ def ensure_language_dir(lang):
     p = os.path.join(LANG_ROOT, lang)
     os.makedirs(p, exist_ok=True)
     os.makedirs(os.path.join(p, "fonts"), exist_ok=True)
-    os.makedirs(os.path.join(p, "ipa_audio"), exist_ok=True)
     return p
 
 def get_languages():

@@ -108,7 +108,7 @@ def update_dict_table(app):
 
 def add_word(app):
     # 8 columns: english, conlang, pos, gender, definition, pronunciation, consistent_phon, consistent_spell
-    empty = ("NEW", "", "", "", "", "", "", "")
+    empty = ("NEW", "", "", "", "", "", "NO", "", "")
     app.dict_tree.insert("", "end", values=empty)
     
 
@@ -180,8 +180,35 @@ def save_dictionary(app):
 
 
 def sync_conjugations_with_dictionary(app):
-    # Placeholder: could auto-generate conjugations for verbs
-    messagebox.showinfo("Sync", "Conjugations synced with dictionary (stub).")
+    if not app.current_language:
+        messagebox.showwarning("No language", "Select a language first.")
+        return
+
+    # Collect all verbs from dictionary
+    verbs = [(eng, data["conlang"]) for eng, data in app.dictionary.items()
+             if data.get("pos", "").lower() == "verb"]
+
+    # Track existing English lemmas already in conjugations
+    existing = {row.get("english", "").lower() for row in app.conjugations}
+
+    new_rows = []
+    for eng, con in verbs:
+        if eng.lower() not in existing:
+            row = {"english": eng, "base": con, "past": "", "present": "", "future": ""}
+            new_rows.append(row)
+            app.conjugations.append(row)
+
+            # Also insert into the Conjugations tree if it exists
+            if hasattr(app, "conj_tree"):
+                app.conj_tree.insert("", "end", values=(eng, con, "", "", ""))
+
+    # Save to CSV
+    from utils.file_io import ensure_language_dir, save_csv
+    from constants import CONJ_FILE, CONJ_FIELDS
+    langdir = ensure_language_dir(app.current_language)
+    save_csv(os.path.join(langdir, CONJ_FILE), CONJ_FIELDS, app.conjugations)
+
+    messagebox.showinfo("Sync", f"Added {len(new_rows)} new verbs to conjugations. (Make sure to 'Reload from language' first.)")
 
 def play_selected_pronunciation(app):
     sel = app.dict_tree.selection()

@@ -18,7 +18,7 @@ NUMBERS_FILE = "numbers.csv"
 DICT_FIELDS = [
     "english", "conlang", "pos", "gender",
     "definition", "pronunciation",
-    "consistent_phon", "consistent_spell"
+    "loanword", "consistent_phon", "consistent_spell"
 ]
 PHONO_FIELDS = ["ipa", "example", "type", "notes"]
 CONJ_FIELDS = ["english", "base", "past", "present", "future"]

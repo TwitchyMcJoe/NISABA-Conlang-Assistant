@@ -10,6 +10,7 @@ from constants import (
     FONTS_DIRNAME, DICT_FILE, DICT_FIELDS
 )
 from utils.file_io import load_csv
+from utils.conjugation_utils import analyze_verb_form
 
 
 def build_translation_tab(app):
@@ -18,19 +19,6 @@ def build_translation_tab(app):
 
     ttk.Label(tab, text="Translation Tool",
               font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=10, pady=(8, 4))
-
-    # Tense selector (present/past/future)
-    tense_frame = ttk.Frame(tab)
-    tense_frame.pack(fill="x", padx=6, pady=(4, 2))
-    ttk.Label(tense_frame, text="Tense:").pack(side="left")
-    app.tense_var = tk.StringVar(value="present")
-    ttk.Combobox(
-        tense_frame,
-        textvariable=app.tense_var,
-        values=["present", "past", "future"],
-        width=10,
-        state="readonly"
-    ).pack(side="left", padx=4)
 
     # English → Conlang
     ttk.Label(tab, text="English → Conlang").pack(anchor="w", padx=8)
@@ -95,33 +83,40 @@ def translate_to_conlang(app):
     else:
         parsed = parse_grammar_file(app)
 
-    # Apply phrase-level transforms (supports {placeholders} and "=>")
+    # Apply phrase-level transforms
     transformed_phrase = apply_phrase_transforms(text, parsed.get("transforms", []))
 
-    # Tokenize after transforms, then dictionary + word-level rules
     out_words = []
     for tok in transformed_phrase.split():
-        entry = app.dictionary.get(tok.lower())
+        con = f"[{tok}]"
+        pos = ""
+
+        # Always lemmatize
+        lemma, conj_type = analyze_verb_form(tok)
+
+        # Try dictionary lookup on token, then lemma
+        entry = app.dictionary.get(tok.lower()) or app.dictionary.get(lemma.lower())
+
         if entry:
-            con = entry.get("conlang", "") or ""
+            con = entry.get("conlang", "") or con
             pos = (entry.get("pos", "") or "").lower()
-        else:
-            con = f"[{tok}]"
-            pos = ""
 
-        # Prefixes/Suffixes from parsed grammar
+            # If it's a verb, apply conjugation
+            if pos == "verb":
+                con_base = entry.get("conlang", "")
+                tense = app.tense_var.get() if hasattr(app, "tense_var") else "present"
+                for row in app.conjugations:
+                    if (row.get("english") or "").lower() == lemma.lower():
+                        con = row.get(tense, con_base) or con_base
+                        break
+
+        # Apply prefixes/suffixes
         con = apply_prefix_suffix(con, pos, parsed)
-
-        # Conjugations by selected tense (only for verbs)
-        if pos == "verb" and getattr(app, "conjugations", None):
-            tense = app.tense_var.get() if hasattr(app, "tense_var") else "present"
-            con = apply_conjugation_for_token(con, tok, app.conjugations, tense)
-
         out_words.append(con)
 
     result = " ".join(out_words)
 
-    # Output + pronunciation (first input word)
+    # Output + pronunciation
     app.trans_output.delete("1.0", tk.END)
     app.trans_output.insert(tk.END, result)
 
@@ -129,8 +124,99 @@ def translate_to_conlang(app):
     pron = app.dictionary.get(first_word.lower(), {}).get("pronunciation", "") if first_word else ""
     app.trans_pron.configure(text=pron or "—")
 
-    # Render glyphs
     render_glyphs(app, result)
+
+##def translate_to_conlang(app):
+##    text = app.trans_input.get("1.0", tk.END).strip()
+##    if not text:
+##        return
+##    if not app.current_language:
+##        messagebox.showwarning("No language", "Load a language first.")
+##        return
+##    if not app.dictionary:
+##        messagebox.showwarning("No dictionary", "Load a language first.")
+##        return
+##
+##    # Parse grammar from the editor if present; else from grammar.txt
+##    grammar_text = ""
+##    if hasattr(app, "grammar_editor"):
+##        grammar_text = app.grammar_editor.get("1.0", tk.END)
+##        parsed = parse_grammar_text(grammar_text)
+##    else:
+##        parsed = parse_grammar_file(app)
+##
+##    # Apply phrase-level transforms (supports {placeholders} and "=>")
+##    transformed_phrase = apply_phrase_transforms(text, parsed.get("transforms", []))
+##
+##    # Tokenize after transforms, then dictionary + word-level rules
+##    out_words = []
+####    for tok in transformed_phrase.split():
+##        entry = app.dictionary.get(tok.lower())
+##        if entry:
+##            con = entry.get("conlang", "") or ""
+##            pos = (entry.get("pos", "") or "").lower()
+##        else:
+##            con = f"[{tok}]"
+##            pos = ""
+##
+##        # Prefixes/Suffixes from parsed grammar
+##        con = apply_prefix_suffix(con, pos, parsed)
+##
+##        # Conjugations by selected tense (only for verbs)
+##        if pos == "verb" and getattr(app, "conjugations", None):
+##            tense = app.tense_var.get() if hasattr(app, "tense_var") else "present"
+##            con = apply_conjugation_for_token(con, tok, app.conjugations, tense)
+##
+##        out_words.append(con)
+##
+##
+##
+##    for tok in transformed_phrase.split():
+##        entry = app.dictionary.get(tok.lower())
+##        if entry:
+##            con = entry.get("conlang", "") or ""
+##            pos = (entry.get("pos", "") or "").lower()
+##        else:
+##            con = f"[{tok}]"
+##            pos = ""
+##
+##        # Prefixes/Suffixes
+##        con = apply_prefix_suffix(con, pos, parsed)
+##
+##        #New verb handling
+##        if pos == "verb":
+##            lemma, conj_type = analyze_verb_form(tok)
+##
+##            # Look up lemma in dictionary
+##            base_entry = app.dictionary.get(lemma.lower())
+##            if base_entry:
+##                con_base = base_entry.get("conlang", "")
+##                tense = app.tense_var.get() if hasattr(app, "tense_var") else "present"
+##
+##                # Match against conjugations.csv
+##                for row in app.conjugations:
+##                    if row.get("english") == lemma:
+##                        con = row.get(tense, con_base) or con_base
+##                        break
+##                else:
+##                    con = con_base
+##            else:
+##                con = f"[{tok}]"
+##
+##        out_words.append(con)
+##
+##    result = " ".join(out_words)
+##
+##    # Output + pronunciation (first input word)
+##    app.trans_output.delete("1.0", tk.END)
+##    app.trans_output.insert(tk.END, result)
+##
+##    first_word = text.split()[0] if text.split() else ""
+##    pron = app.dictionary.get(first_word.lower(), {}).get("pronunciation", "") if first_word else ""
+##    app.trans_pron.configure(text=pron or "—")
+##
+##    # Render glyphs
+##    render_glyphs(app, result)
 
 
 def translate_to_english(app):
@@ -141,12 +227,33 @@ def translate_to_english(app):
         messagebox.showwarning("No dictionary", "Load a language first.")
         return
 
-    # Reverse dictionary
-    rev = {v.get("conlang", "").lower(): k for k, v in app.dictionary.items() if v.get("conlang")}
     words = text.split()
     out = []
+
     for w in words:
-        out.append(rev.get(w, f"[{w}]"))
+        eng = None
+
+        # 1) Direct reverse dictionary lookup
+        for k, v in app.dictionary.items():
+            if v.get("conlang", "").lower() == w:
+                eng = k
+                break
+
+        # 2) If not found, check conjugations.csv
+        if not eng and getattr(app, "conjugations", None):
+            for row in app.conjugations:
+                for tense in ("past", "present", "future"):
+                    if (row.get(tense) or "").lower() == w:
+                        eng = row.get("english", "")
+                        break
+                if eng:
+                    break
+
+        # 3) Fallback
+        if not eng:
+            eng = f"[{w}]"
+
+        out.append(eng)
 
     result = " ".join(out)
     app.trans_output.delete("1.0", tk.END)
@@ -154,7 +261,6 @@ def translate_to_english(app):
     app.trans_pron.configure(text="—")
 
     render_glyphs(app, text)
-
 
 # -------------------------
 # Grammar parsing
