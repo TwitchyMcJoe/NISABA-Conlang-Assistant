@@ -1,0 +1,23 @@
+# Core dependencies
+mlconjug3==3.11.0
+scikit-learn==1.3.0
+pyyaml==6.0.2
+
+# NLP / Linguistics
+nltk==3.9.2
+
+# Data handling
+pandas==2.3.3
+numpy==1.26.4
+scipy==1.14.1
+
+# Visualization / plotting (if used in your app)
+matplotlib==3.9.2
+
+# GUI / packaging helpers
+pillow==10.4.0
+psutil==6.0.0
+
+# Optional: audio playback support
+pydub==0.25.1
+playsound==1.3.0
